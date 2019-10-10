@@ -1,77 +1,24 @@
-require 'yaml'
-require 'fileutils'
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
 
-required_plugins = %w( vagrant-hostmanager vagrant-vbguest )
-required_plugins.each do |plugin|
-    exec "vagrant plugin install #{plugin}" unless Vagrant.has_plugin? plugin
-end
+Vagrant.configure("2") do |config|
+    config.vm.box = "ubuntu/xenial64"
+    config.vm.box_version = "20190807.0.0"
+    config.vm.network "private_network", ip: "192.168.39.50"
+    config.vm.hostname = "advanced"
+    config.vm.synced_folder ".", "/var/www", :mount_options => ["dmode=777", "fmode=666"]
 
-domains = {
-  frontend: 'y2aa-frontend.test',
-  backend:  'y2aa-backend.test'
-}
+    config.vm.provider :virtualbox do |v|
+	  v.customize ["modifyvm", :id, "--memory", 4096]
+	  v.name = 'advanced'
+	end
 
-config = {
-  local: './vagrant/config/vagrant-local.yml',
-  example: './vagrant/config/vagrant-local.example.yml'
-}
+	config.vm.provision "shell", path: "2ambox/provision.sh", privileged: true
+	config.vm.provision "shell", path: "2ambox/configure-nginx.sh", run: "always", privileged: true
 
-# copy config from example if local config not exists
-FileUtils.cp config[:example], config[:local] unless File.exist?(config[:local])
-# read config
-options = YAML.load_file config[:local]
+    config.vm.provision "shell", run: "always", privileged: false, inline: <<-EOF
+    echo "Your vagrant machine is loaded at hosts config: 192.168.39.50 advanced.local"
+	echo "Please add this configuration in your hosts file located on /etc/hosts on Linux od Windows/System32/drivers/etc/hosts on Windows."
+EOF
 
-# check github token
-if options['github_token'].nil? || options['github_token'].to_s.length != 40
-  puts "You must place REAL GitHub token into configuration:\n/yii2-app-advanced/vagrant/config/vagrant-local.yml"
-  exit
-end
-
-# vagrant configurate
-Vagrant.configure(2) do |config|
-  # select the box
-  config.vm.box = 'bento/ubuntu-16.04'
-
-  # should we ask about box updates?
-  config.vm.box_check_update = options['box_check_update']
-
-  config.vm.provider 'virtualbox' do |vb|
-    # machine cpus count
-    vb.cpus = options['cpus']
-    # machine memory size
-    vb.memory = options['memory']
-    # machine name (for VirtualBox UI)
-    vb.name = options['machine_name']
-  end
-
-  # machine name (for vagrant console)
-  config.vm.define options['machine_name']
-
-  # machine name (for guest machine console)
-  config.vm.hostname = options['machine_name']
-
-  # network settings
-  config.vm.network 'private_network', ip: options['ip']
-
-  # sync: folder 'yii2-app-advanced' (host machine) -> folder '/app' (guest machine)
-  config.vm.synced_folder './', '/app', owner: 'vagrant', group: 'vagrant'
-
-  # disable folder '/vagrant' (guest machine)
-  config.vm.synced_folder '.', '/vagrant', disabled: true
-
-  # hosts settings (host machine)
-  config.vm.provision :hostmanager
-  config.hostmanager.enabled            = true
-  config.hostmanager.manage_host        = true
-  config.hostmanager.ignore_private_ip  = false
-  config.hostmanager.include_offline    = true
-  config.hostmanager.aliases            = domains.values
-
-  # provisioners
-  config.vm.provision 'shell', path: './vagrant/provision/once-as-root.sh', args: [options['timezone']]
-  config.vm.provision 'shell', path: './vagrant/provision/once-as-vagrant.sh', args: [options['github_token']], privileged: false
-  config.vm.provision 'shell', path: './vagrant/provision/always-as-root.sh', run: 'always'
-
-  # post-install message (vagrant console)
-  config.vm.post_up_message = "Frontend URL: http://#{domains[:frontend]}\nBackend URL: http://#{domains[:backend]}"
 end
