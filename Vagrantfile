@@ -13,8 +13,8 @@ Vagrant.configure("2") do |config|
 	  v.name = 'advanced'
 	end
 
-	config.vm.provision "shell", path: "2ambox/provision.sh", privileged: true
-	config.vm.provision "shell", path: "2ambox/configure-nginx.sh", run: "always", privileged: true
+	config.vm.provision "shell", path: "vagrant/provision.sh", privileged: true
+	config.vm.provision "shell", path: "vagrant/configure-nginx.sh", run: "always", privileged: true
 
     config.vm.provision "shell", run: "always", privileged: false, inline: <<-EOF
     echo "Your vagrant machine is loaded at hosts config: 192.168.39.50 advanced.local"
